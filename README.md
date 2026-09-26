@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Лекции профессора Михеева
 
-## Getting Started
+Сайт для загрузки и чтения лекций. Next.js + Supabase, бесплатный хостинг на Vercel.
 
-First, run the development server:
+## 1. Supabase
+
+1. Зайдите на [supabase.com](https://supabase.com), создайте аккаунт и новый проект (Free tier).
+2. Дождитесь, пока проект поднимется (1–2 минуты).
+3. Откройте **SQL Editor** → **New query**, вставьте содержимое файла
+   [`supabase/schema.sql`](./supabase/schema.sql) и нажмите **Run**.
+   Это создаст таблицу `lectures` и приватный бакет `lectures` для файлов.
+4. Откройте **Project Settings → Data API** и скопируйте:
+   - **Project URL** → это `NEXT_PUBLIC_SUPABASE_URL`
+5. Откройте **Project Settings → API Keys** и скопируйте:
+   - **anon public** ключ → это `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - **service_role secret** ключ → это `SUPABASE_SERVICE_ROLE_KEY`
+     (это секретный ключ с полным доступом — никогда не публикуйте его
+     и не добавляйте в переменные с префиксом `NEXT_PUBLIC_`)
+
+## 2. Переменные окружения
+
+Скопируйте `.env.local.example` в `.env.local` и заполните:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.local.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` — из Supabase (шаг 1)
+- `UPLOADER_PASSWORD` — пароль для профессора (доступ к загрузке)
+- `READER_PASSWORD` — пароль для студентов (доступ только на чтение)
+- `SESSION_SECRET` — любая длинная случайная строка, например `openssl rand -hex 32`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 3. Локальный запуск
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+npm run dev
+```
 
-## Learn More
+Откройте http://localhost:3000 — вас перенаправит на страницу входа.
 
-To learn more about Next.js, take a look at the following resources:
+## 4. Деплой на GitHub + Vercel
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Создайте пустой репозиторий на GitHub и запушьте код:
+   ```bash
+   git add -A
+   git commit -m "Initial version"
+   git branch -M main
+   git remote add origin <ссылка на ваш репозиторий>
+   git push -u origin main
+   ```
+2. Зайдите на [vercel.com](https://vercel.com), войдите через GitHub и нажмите **Add New → Project**.
+3. Выберите репозиторий — Vercel сам определит, что это Next.js.
+4. В разделе **Environment Variables** добавьте все переменные из `.env.local`
+   (те же имена и значения, что в шаге 2).
+5. Нажмите **Deploy**. Через 1–2 минуты сайт будет доступен по ссылке вида
+   `https://ваш-проект.vercel.app`.
+6. Проверьте обе роли на реальном сайте: войдите с `UPLOADER_PASSWORD`,
+   загрузите лекцию; затем откройте сайт в другой вкладке/браузере и
+   войдите с `READER_PASSWORD`, убедитесь, что лекция видна, скачивается
+   и (для PDF/картинок) открывается для просмотра.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Как это устроено
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Один пароль в поле входа → выдаётся cookie-сессия на 30 дней (роль
+  «uploader» или «reader», без email и регистрации).
+- Файлы лекций загружаются из браузера напрямую в приватный бакет Supabase
+  по временной подписанной ссылке — это нужно, чтобы обходить лимит
+  размера запроса у серверных функций Vercel (актуально для видео).
+- Ссылки на скачивание/просмотр — тоже временные подписанные ссылки,
+  которые генерирует сервер при открытии страницы `/lectures`.
+- Таблица `lectures` защищена Row Level Security: доступ к ней есть
+  только у сервера приложения (через `service_role` ключ), напрямую из
+  браузера в базу никто попасть не может.
